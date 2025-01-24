@@ -576,6 +576,7 @@ class LlamaModel(LlamaPreTrainedModel):
         all_self_attns = () if output_attentions else None
 
         for decoder_layer in order:
+            print(decode_layer)
             decoder_layer = self.layers[decoder_layer]
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
