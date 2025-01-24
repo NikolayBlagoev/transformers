@@ -519,6 +519,7 @@ class LlamaModel(LlamaPreTrainedModel):
     def forward(
         self,
         input_ids: torch.LongTensor = None,
+        order = [],
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Cache] = None,
@@ -574,24 +575,12 @@ class LlamaModel(LlamaPreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
-        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
+        for decoder_layer in order:
+            decoder_layer = self.layers[decoder_layer]
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
-                    decoder_layer.__call__,
-                    hidden_states,
-                    causal_mask,
-                    position_ids,
-                    past_key_values,
-                    output_attentions,
-                    use_cache,
-                    cache_position,
-                    position_embeddings,
-                )
-            else:
-                layer_outputs = decoder_layer(
+            layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
@@ -784,6 +773,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
     def forward(
         self,
         input_ids: torch.LongTensor = None,
+        order = [],
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
@@ -838,6 +828,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.model(
             input_ids=input_ids,
+            order = order,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
