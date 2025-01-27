@@ -245,10 +245,10 @@ class LlamaAttention(nn.Module):
         self.q_proj = nn.Linear(
             config.hidden_size, config.num_attention_heads * self.head_dim, bias=config.attention_bias
         )
-        self.lora_query_matrix_B = nn.Parameter(torch.zeros(config.num_attention_heads * self.head_dim, r))
-        self.lora_query_matrix_A = nn.Parameter(torch.randn(r, config.hidden_size))
-        self.lora_value_matrix_B = nn.Parameter(torch.zeros(config.num_key_value_heads * self.head_dim, r))
-        self.lora_value_matrix_A = nn.Parameter(torch.randn(r, config.hidden_size))
+        self.lora_query_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
+        self.lora_query_matrix_A = nn.Parameter(torch.randn(r, config.num_attention_heads * self.head_dim))
+        self.lora_value_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
+        self.lora_value_matrix_A = nn.Parameter(torch.randn(r, config.num_key_value_heads * self.head_dim))
         self.lora_query_matrix_B.is_lora = True
         self.lora_query_matrix_A.is_lora = True
         self.lora_value_matrix_B.is_lora = True
