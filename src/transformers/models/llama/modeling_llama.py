@@ -277,12 +277,15 @@ class LlamaAttention(nn.Module):
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
         lora_query_weights = torch.matmul(self.lora_query_matrix_B, self.lora_query_matrix_A)
-        tmp = nn.functional.linear(hidden_states, lora_query_weights)
-        query_states = (self.q_proj(hidden_states) + 2*tmp).view(hidden_shape).transpose(1, 2)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights.T)
+        print("SHAPE",tmp.shape)
+        mit = self.q_proj(hidden_states)
+        print("mit SHAPE", mit.shape)
+        query_states = (mit + 2*tmp).view(hidden_shape).transpose(1, 2)
 
         key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         lora_query_weights = torch.matmul(self.lora_value_matrix_B, self.lora_value_matrix_A)
-        tmp = nn.functional.linear(hidden_states, lora_query_weights)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights.T)
         value_states = (self.v_proj(hidden_states) + 2*tmp).view(hidden_shape).transpose(1, 2)
 
         cos, sin = position_embeddings
