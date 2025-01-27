@@ -241,22 +241,26 @@ class LlamaAttention(nn.Module):
         self.scaling = self.head_dim**-0.5
         self.attention_dropout = config.attention_dropout
         self.is_causal = True
-
+        r = 8
         self.q_proj = nn.Linear(
             config.hidden_size, config.num_attention_heads * self.head_dim, bias=config.attention_bias
         )
-        self.q_lora = nn.Linear(config.hidden_size, config.num_attention_heads * self.head_dim, bias=False)
-        for p in self.q_lora.parameters():
-            p.is_lora = True
+        self.lora_query_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
+        self.lora_query_matrix_A = nn.Parameter(torch.randn(r, config.num_attention_heads * self.head_dim))
+        self.lora_value_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
+        self.lora_value_matrix_A = nn.Parameter(torch.randn(r, config.num_key_value_heads * self.head_dim))
+        self.lora_query_matrix_B.is_lora = True
+        self.lora_query_matrix_A.is_lora = True
+        self.lora_value_matrix_B.is_lora = True
+        self.lora_value_matrix_A.is_lora = True
+        
         self.k_proj = nn.Linear(
             config.hidden_size, config.num_key_value_heads * self.head_dim, bias=config.attention_bias
         )
         self.v_proj = nn.Linear(
             config.hidden_size, config.num_key_value_heads * self.head_dim, bias=config.attention_bias
         )
-        self.v_lora = nn.Linear(config.hidden_size, config.num_key_value_heads * self.head_dim, bias=False)
-        for p in self.v_lora.parameters():
-            p.is_lora = True
+        
         self.o_proj = nn.Linear(
             config.num_attention_heads * self.head_dim, config.hidden_size, bias=config.attention_bias
         )
@@ -272,10 +276,14 @@ class LlamaAttention(nn.Module):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
-        
-        query_states = (self.q_proj(hidden_states) + self.q_lora(hidden_states)).view(hidden_shape).transpose(1, 2)
+        lora_query_weights = torch.matmul(self.lora_query_matrix_B, self.lora_query_matrix_A)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights)
+        query_states = (self.q_proj(hidden_states) + tmp).view(hidden_shape).transpose(1, 2)
+
         key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
-        value_states = (self.v_proj(hidden_states) + self.v_lora(hidden_states)).view(hidden_shape).transpose(1, 2)
+        lora_query_weights = torch.matmul(self.lora_value_matrix_B, self.lora_value_matrix_A)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights)
+        value_states = (self.v_proj(hidden_states) + tmp).view(hidden_shape).transpose(1, 2)
 
         cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
