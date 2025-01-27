@@ -245,10 +245,10 @@ class LlamaAttention(nn.Module):
         self.q_proj = nn.Linear(
             config.hidden_size, config.num_attention_heads * self.head_dim, bias=config.attention_bias
         )
-        self.lora_query_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
-        self.lora_query_matrix_A = nn.Parameter(torch.randn(r, config.num_attention_heads * self.head_dim))
-        self.lora_value_matrix_B = nn.Parameter(torch.zeros(config.hidden_size, r))
-        self.lora_value_matrix_A = nn.Parameter(torch.randn(r, config.num_key_value_heads * self.head_dim))
+        self.lora_query_matrix_B = nn.Parameter(torch.zeros(config.num_attention_heads * self.head_dim, r))
+        self.lora_query_matrix_A = nn.Parameter(torch.randn(r, config.hidden_size))
+        self.lora_value_matrix_B = nn.Parameter(torch.zeros(config.num_key_value_heads * self.head_dim, r))
+        self.lora_value_matrix_A = nn.Parameter(torch.randn(r, config.hidden_size))
         self.lora_query_matrix_B.is_lora = True
         self.lora_query_matrix_A.is_lora = True
         self.lora_value_matrix_B.is_lora = True
@@ -277,12 +277,12 @@ class LlamaAttention(nn.Module):
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
         lora_query_weights = torch.matmul(self.lora_query_matrix_B, self.lora_query_matrix_A)
-        tmp = nn.functional.linear(hidden_states, lora_query_weights.T)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights)
         query_states = (self.q_proj(hidden_states) + 2*tmp).view(hidden_shape).transpose(1, 2)
 
         key_states = self.k_proj(hidden_states).view(hidden_shape).transpose(1, 2)
         lora_query_weights = torch.matmul(self.lora_value_matrix_B, self.lora_value_matrix_A)
-        tmp = nn.functional.linear(hidden_states, lora_query_weights.T)
+        tmp = nn.functional.linear(hidden_states, lora_query_weights)
         value_states = (self.v_proj(hidden_states) + 2*tmp).view(hidden_shape).transpose(1, 2)
 
         cos, sin = position_embeddings
