@@ -388,7 +388,7 @@ class LlamaModel(LlamaPreTrainedModel):
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         for decoder_layer in order:
-            decoder_layer = order[decoder_layer]
+            decoder_layer = self.layers[decoder_layer]
             hidden_states = decoder_layer(
                 hidden_states,
                 attention_mask=causal_mask,
