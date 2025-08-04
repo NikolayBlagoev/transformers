@@ -383,6 +383,7 @@ class GraniteModel(GranitePreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
+        order = [],
         **kwargs: Unpack[TransformersKwargs],
     ) -> BaseModelOutputWithPast:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -435,9 +436,12 @@ class GraniteModel(GranitePreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
 
-        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
-            if output_hidden_states:
-                all_hidden_states += (hidden_states,)
+        for decoder_layer in order:
+            factor = 1.0
+            if decoder_layer in post_layer_factor:
+                factor = post_layer_factor[decoder_layer]
+            print(decoder_layer,factor)
+            decoder_layer = self.layers[decoder_layer]
 
             layer_outputs = decoder_layer(
                 hidden_states,
