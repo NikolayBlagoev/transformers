@@ -355,6 +355,7 @@ class LlamaModel(LlamaPreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         order = [],
+        post_layer_factor = {},
         **kwargs: Unpack[TransformersKwargs],
     ) -> BaseModelOutputWithPast:
         if (input_ids is None) ^ (inputs_embeds is not None):
@@ -388,6 +389,9 @@ class LlamaModel(LlamaPreTrainedModel):
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         for decoder_layer in order:
+            factor = 1.0
+            if decoder_layer in post_layer_factor:
+                factor = post_layer_factor[decoder_layer]
             decoder_layer = self.layers[decoder_layer]
             hidden_states = decoder_layer(
                 hidden_states,
@@ -397,7 +401,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 cache_position=cache_position,
                 position_embeddings=position_embeddings,
                 **kwargs,
-            )
+            ) * factor
 
         hidden_states = self.norm(hidden_states)
         return BaseModelOutputWithPast(
