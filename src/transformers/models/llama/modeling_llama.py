@@ -392,6 +392,7 @@ class LlamaModel(LlamaPreTrainedModel):
             factor = 1.0
             if decoder_layer in post_layer_factor:
                 factor = post_layer_factor[decoder_layer]
+            print(decoder_layer,factor)
             decoder_layer = self.layers[decoder_layer]
             hidden_states = decoder_layer(
                 hidden_states,
