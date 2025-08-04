@@ -281,6 +281,7 @@ class LlamaDecoderLayer(GradientCheckpointingLayer):
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        factor = 1.0,
         **kwargs: Unpack[TransformersKwargs],
     ) -> tuple[torch.Tensor]:
         residual = hidden_states
@@ -302,7 +303,7 @@ class LlamaDecoderLayer(GradientCheckpointingLayer):
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        hidden_states = residual + hidden_states * factor
         return hidden_states
 
 
@@ -401,8 +402,9 @@ class LlamaModel(LlamaPreTrainedModel):
                 past_key_value=past_key_values,
                 cache_position=cache_position,
                 position_embeddings=position_embeddings,
+                factor = factor,
                 **kwargs,
-            ) * factor
+            )
 
         hidden_states = self.norm(hidden_states)
         return BaseModelOutputWithPast(
