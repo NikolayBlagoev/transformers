@@ -393,7 +393,7 @@ class LlamaModel(LlamaPreTrainedModel):
             factor = 1.0
             if decoder_layer in post_layer_factor:
                 factor = post_layer_factor[decoder_layer]
-            print(decoder_layer,factor)
+            # print(decoder_layer,factor)
             decoder_layer = self.layers[decoder_layer]
             hidden_states = decoder_layer(
                 hidden_states,
@@ -424,7 +424,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
         self.model = LlamaModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.order = []
+        self.order = list(range(len(self.model.layers)))
         # Initialize weights and apply final processing
         self.post_init()
 
