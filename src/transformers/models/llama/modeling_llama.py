@@ -21,7 +21,7 @@ from typing import Optional
 
 import torch
 from torch import nn
-
+import os
 from ...activations import ACT2FN
 from ...cache_utils import Cache, DynamicCache
 from ...generation import GenerationMixin
@@ -380,6 +380,7 @@ class LlamaModel(LlamaPreTrainedModel):
         past_key_values: Cache | None = None,
         inputs_embeds: torch.FloatTensor | None = None,
         use_cache: bool | None = None,
+        order = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> BaseModelOutputWithPast:
         if (input_ids is None) ^ (inputs_embeds is not None):
@@ -406,8 +407,14 @@ class LlamaModel(LlamaPreTrainedModel):
 
         hidden_states = inputs_embeds
         position_embeddings = self.rotary_emb(hidden_states, position_ids=position_ids)
-
-        for decoder_layer in self.layers[: self.config.num_hidden_layers]:
+        if order == None:
+            order = os.getenv("TRANSFORMERS_ORDER")
+        if order == None:
+            order = [idx for idx in range(len(self.layers))]
+        if isinstance(order,str):
+            order = list(map(lambda el: int(el),order.split(",")))
+        for idx in order:
+            decoder_layer = self.layers[idx]
             hidden_states = decoder_layer(
                 hidden_states,
                 attention_mask=causal_mask,
@@ -452,6 +459,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
         labels: torch.LongTensor | None = None,
         use_cache: bool | None = None,
         logits_to_keep: int | torch.Tensor = 0,
+        order = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> CausalLMOutputWithPast:
         r"""
@@ -478,6 +486,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
+            order = order,
             **kwargs,
         )
 
