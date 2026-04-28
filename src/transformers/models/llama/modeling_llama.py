@@ -367,7 +367,7 @@ class LlamaModel(LlamaPreTrainedModel):
         self.gradient_checkpointing = False
         self.order = None
         if os.getenv("Skip_Paths") != None:
-            self.order = os.getenv("Skip_Paths").skip(",")
+            self.order = os.getenv("Skip_Paths").split(",")
             self.order = list(map(lambda el: int(el), self.oder))
         # Initialize weights and apply final processing
         self.post_init()
