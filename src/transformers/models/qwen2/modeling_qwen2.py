@@ -343,7 +343,11 @@ class Qwen2Model(Qwen2PreTrainedModel):
         self.rotary_emb = Qwen2RotaryEmbedding(config=config)
         self.gradient_checkpointing = False
         self.has_sliding_layers = "sliding_attention" in self.config.layer_types
-
+        print("ENVIRONMENT VARIABLE ",os.getenv("Skip_Paths"))
+        if os.getenv("Skip_Paths") != None:
+            self.order = os.getenv("Skip_Paths").split(",")
+            self.order = list(map(lambda el: int(el), self.oder))
+            print("PATH: ",self.order)
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -366,7 +370,8 @@ class Qwen2Model(Qwen2PreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-
+        if order == None:
+            order = self.order
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache(config=self.config)
 
