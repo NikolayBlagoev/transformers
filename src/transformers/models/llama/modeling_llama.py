@@ -366,6 +366,7 @@ class LlamaModel(LlamaPreTrainedModel):
         self.rotary_emb = LlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
         self.order = None
+        print("ENVIRONMENT VARIABLE ",os.getenv("Skip_Paths"))
         if os.getenv("Skip_Paths") != None:
             self.order = os.getenv("Skip_Paths").split(",")
             self.order = list(map(lambda el: int(el), self.oder))
