@@ -350,7 +350,7 @@ class LlamaPreTrainedModel(PreTrainedModel):
         "attentions": LlamaAttention,
     }
 
-
+import os
 @auto_docstring
 class LlamaModel(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig):
@@ -365,7 +365,10 @@ class LlamaModel(LlamaPreTrainedModel):
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = LlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
-
+        self.order = None
+        if os.getenv("Skip_Paths") != None:
+            self.order = os.getenv("Skip_Paths").skip(",")
+            self.order = list(map(lambda el: int(el), self.oder))
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -385,7 +388,8 @@ class LlamaModel(LlamaPreTrainedModel):
     ) -> BaseModelOutputWithPast:
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
-
+        if order == None:
+            order = self.order
         if inputs_embeds is None:
             inputs_embeds: torch.Tensor = self.embed_tokens(input_ids)
 
