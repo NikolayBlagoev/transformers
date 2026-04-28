@@ -346,7 +346,7 @@ class Qwen2Model(Qwen2PreTrainedModel):
         print("ENVIRONMENT VARIABLE ",os.getenv("Skip_Paths"))
         if os.getenv("Skip_Paths") != None:
             self.order = os.getenv("Skip_Paths").split(",")
-            self.order = list(map(lambda el: int(el), self.oder))
+            self.order = list(map(lambda el: int(el), self.order))
             print("PATH: ",self.order)
         # Initialize weights and apply final processing
         self.post_init()
