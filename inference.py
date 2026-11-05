@@ -12,14 +12,88 @@ Two engines:
 """
 
 import argparse
+import contextlib
+import json
+import os
 
 import torch
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, ContinuousBatchingConfig, GenerationConfig
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, ContinuousBatchingConfig, GenerationConfig
 from transformers.generation.continuous_batching import ContinuousBatchingManager
 
 
 CB_LAYER_TYPES = {"full_attention", "sliding_attention"}
+
+
+# ---- model loading ----------------------------------------------------------------------------------------------------
+def modelopt_quant(path, config):
+    """The ModelOpt quantization section of a checkpoint (NVIDIA's FP8 exports, e.g. Nemotron 3), or None."""
+    qc = getattr(config, "quantization_config", None)
+    qc = qc if isinstance(qc, dict) else getattr(qc, "to_dict", lambda: None)()
+    if qc is not None and qc.get("quant_method") == "modelopt":
+        return qc
+    quant_file = os.path.join(path, "hf_quant_config.json")
+    if os.path.isfile(quant_file):
+        with open(quant_file) as f:
+            return json.load(f).get("quantization")
+    return None
+
+
+@contextlib.contextmanager
+def modelopt_fp8_renames():
+    """While loading: ModelOpt's per-tensor `weight_scale` (dequant multiplier) is transformers' `weight_scale_inv`."""
+    from transformers.core_model_loading import WeightRenaming
+    from transformers.quantizers.quantizer_finegrained_fp8 import FineGrainedFP8HfQuantizer
+
+    original = FineGrainedFP8HfQuantizer.update_weight_conversions
+
+    def update_weight_conversions(self, weight_conversions, model):
+        rename = WeightRenaming(source_patterns=r"\.weight_scale$", target_patterns=".weight_scale_inv")
+        return [rename] + original(self, weight_conversions, model)
+
+    FineGrainedFP8HfQuantizer.update_weight_conversions = update_weight_conversions
+    try:
+        yield
+    finally:
+        FineGrainedFP8HfQuantizer.update_weight_conversions = original
+
+
+def load_model(path, **kwargs):
+    """`from_pretrained`, plus support for ModelOpt per-tensor FP8 checkpoints.
+
+    Those keep their quantization in `hf_quant_config.json`, which transformers doesn't read: loaded as is, the FP8
+    weights are used without their scales and the model outputs garbage. They are loaded through transformers' own
+    FP8 path instead (per-tensor weight scales, dynamic activation quantization; the static `input_scale`s are unused).
+    """
+    config = AutoConfig.from_pretrained(path)
+    quant = modelopt_quant(path, config)
+    if quant is None:
+        return AutoModelForCausalLM.from_pretrained(path, dtype="auto", device_map="auto", **kwargs).eval()
+
+    algo = quant.get("quant_algo")
+    if algo != "FP8":
+        raise NotImplementedError(f"ModelOpt {algo} checkpoints are not supported, only per-tensor FP8")
+    # ModelOpt globs (`*.mixer.gate`) -> the regexes `modules_to_not_convert` takes; dots are left as wildcards
+    skip = [m.replace("*", ".*") for m in quant.get("exclude_modules") or []]
+    config.quantization_config = {
+        "quant_method": "fp8",
+        "activation_scheme": "dynamic",
+        "weight_block_size": None,  # per-tensor
+        "modules_to_not_convert": skip + ["lm_head"],
+    }
+    text_config = config.get_text_config()
+    if not hasattr(text_config, "hidden_act") and hasattr(text_config, "mlp_hidden_act"):
+        text_config.hidden_act = text_config.mlp_hidden_act  # what transformers' FP8 experts read (Nemotron-H: relu2)
+
+    model_cls = AutoModelForCausalLM._model_mapping[type(config)]
+    ignored = model_cls._keys_to_ignore_on_load_unexpected
+    model_cls._keys_to_ignore_on_load_unexpected = list(ignored or []) + [r"\.input_scale$", r"\.[kv]_scale$"]
+    try:
+        with modelopt_fp8_renames():
+            model = model_cls.from_pretrained(path, config=config, dtype="auto", device_map="auto", **kwargs)
+    finally:
+        model_cls._keys_to_ignore_on_load_unexpected = ignored
+    return model.eval()
 
 
 def print_step(header, items):
@@ -180,7 +254,7 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model_kwargs = {"attn_implementation": args.attn} if args.attn else {}
-    model = AutoModelForCausalLM.from_pretrained(args.model, dtype="auto", device_map="auto", **model_kwargs).eval()
+    model = load_model(args.model, **model_kwargs)
     run(model, tokenizer, args.prompts, args.max_new_tokens, args.engine, args.moe_trace, args.lookahead)
 
 

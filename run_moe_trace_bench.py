@@ -24,8 +24,8 @@ from pathlib import Path
 
 import torch
 
-from inference import run
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from inference import load_model, run
+from transformers import AutoTokenizer
 
 
 # Same system message as garlic's runner (inference.cpp)
@@ -132,7 +132,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model, padding_side="left")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(args.model, dtype="auto", device_map="auto").eval()
+    model = load_model(args.model)
 
     for name, prompts in all_prompts.items():
         for k, start in enumerate(range(0, len(prompts), args.batch_size)):
